@@ -96,7 +96,9 @@ sub listen {
   };
   $tls->{SSL_ca_file} = $args->{tls_ca}
     if $args->{tls_ca} && -T $args->{tls_ca};
-  $tls->{SSL_cipher_list} = $args->{tls_ciphers} if $args->{tls_ciphers};
+  $tls->{SSL_cipher_list}    = $args->{tls_ciphers} if $args->{tls_ciphers};
+  $tls->{SSL_npn_protocols}  = $args->{tls_npn}     if $args->{tls_npn};
+  $tls->{SSL_alpn_protocols} = $args->{tls_alpn}    if $args->{tls_alpn};
 }
 
 sub port { shift->{handle}->sockport }
@@ -300,6 +302,18 @@ Path to the TLS key file, defaults to a built-in test key.
   tls_verify => 0x00
 
 TLS verification mode, defaults to C<0x03>.
+
+=item tls_npn
+
+  tls_npn => [ 'spdy/4.0', 'http/1.1' ]
+
+TLS NPN extension, array ref of supported protocols
+
+=item tls_alpn
+
+  tls_alpn => [ 'h2-14', 'http/1.1' ]
+
+TLS ALPN extension, array ref of supported protocols
 
 =back
 

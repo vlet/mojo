@@ -153,7 +153,8 @@ sub _listen {
     reuse   => $query->param('reuse')
   };
   if (my $port = $url->port) { $options->{port} = $port }
-  $options->{"tls_$_"} = $query->param($_) for qw(ca cert ciphers key);
+  $options->{"tls_$_"} = $query->param($_)       for qw(ca cert ciphers key);
+  $options->{"tls_$_"} = $query->every_param($_) for qw(npn alpn);
   my $verify = $query->param('verify');
   $options->{tls_verify} = hex $verify if defined $verify;
   delete $options->{address} if $options->{address} eq '*';
@@ -164,7 +165,15 @@ sub _listen {
     $options => sub {
       my ($loop, $stream, $id) = @_;
 
-      my $c = $self->{connections}{$id} = {tls => $tls};
+      my $proto;
+      if (@{$options->{tls_npn}}) {
+        $proto = $stream->handle->next_proto_negotiated;
+      }
+      if (@{$options->{tls_alpn}}) {
+        $proto = $stream->handle->alpn_selected || $proto;
+      }
+      my $c = $self->{connections}{$id}
+        = {tls => $tls, proto => $proto || 'http/1.1'};
       warn "-- Accept $id (@{[$stream->handle->peerhost]})\n" if DEBUG;
       $stream->timeout($self->inactivity_timeout);
 
