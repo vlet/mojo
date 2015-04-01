@@ -68,7 +68,15 @@ sub stop {
 sub _build_tx {
   my ($self, $id, $c) = @_;
 
-  my $tx = $self->build_tx->connection($id);
+  my $tx;
+  if ($c->{proto} && $c->{proto} =~ /^h2/) {
+    require Mojo::Transaction::HTTP2;
+    $tx = Mojo::Transaction::HTTP2->new;
+  }
+  else {
+    $tx = $self->build_tx;
+  }
+  $tx->connection($id);
   $tx->res->headers->server('Mojolicious (Perl)');
   my $handle = $self->ioloop->stream($id)->handle;
   $tx->local_address($handle->sockhost)->local_port($handle->sockport);
