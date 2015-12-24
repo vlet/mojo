@@ -6,19 +6,14 @@ use IO::Socket::IP;
 use Mojo::IOLoop;
 use Scalar::Util 'weaken';
 use Socket qw(IPPROTO_TCP SOCK_STREAM TCP_NODELAY);
+use Mojo::TLS
+  qw(TLS TLS_READ TLS_WRITE TLS_NPN TLS_ALPN TLS_C_SNI mojo_protocols);
 
 # Non-blocking name resolution requires Net::DNS::Native
 use constant NDN => $ENV{MOJO_NO_NDN}
   ? 0
   : eval 'use Net::DNS::Native 0.15 (); 1';
 my $NDN = NDN ? Net::DNS::Native->new(pool => 5, extra_thread => 1) : undef;
-
-# TLS support requires IO::Socket::SSL
-use constant TLS => $ENV{MOJO_NO_TLS}
-  ? 0
-  : eval 'use IO::Socket::SSL 1.94 (); 1';
-use constant TLS_READ  => TLS ? IO::Socket::SSL::SSL_WANT_READ()  : 0;
-use constant TLS_WRITE => TLS ? IO::Socket::SSL::SSL_WANT_WRITE() : 0;
 
 # SOCKS support requires IO::Socket::Socks
 use constant SOCKS => $ENV{MOJO_NO_SOCKS}
@@ -171,14 +166,16 @@ sub _try_tls {
   my %options = (
     SSL_ca_file => $args->{tls_ca}
       && -T $args->{tls_ca} ? $args->{tls_ca} : undef,
-    SSL_cert_file  => $args->{tls_cert},
-    SSL_error_trap => sub { $self->emit(error => $_[1]) },
-    SSL_hostname   => IO::Socket::SSL->can_client_sni ? $args->{address} : '',
-    SSL_key_file   => $args->{tls_key},
+    SSL_cert_file       => $args->{tls_cert},
+    SSL_error_trap      => sub { $self->emit(error => $_[1]) },
+    SSL_hostname        => TLS_C_SNI ? $args->{address} : '',
+    SSL_key_file        => $args->{tls_key},
     SSL_startHandshake  => 0,
     SSL_verify_mode     => $args->{tls_ca} ? 0x01 : 0x00,
     SSL_verifycn_name   => $args->{address},
-    SSL_verifycn_scheme => $args->{tls_ca} ? 'http' : undef
+    SSL_verifycn_scheme => $args->{tls_ca} ? 'http' : undef,
+    TLS_ALPN ? (SSL_alpn_protocols => [mojo_protocols]) : (),
+    !TLS_ALPN && TLS_NPN ? (SSL_npn_protocols => [mojo_protocols]) : ()
   );
   my $reactor = $self->reactor;
   $reactor->remove($handle);

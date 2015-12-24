@@ -8,13 +8,7 @@ use IO::Socket::IP;
 use Mojo::IOLoop;
 use Scalar::Util 'weaken';
 use Socket qw(IPPROTO_TCP TCP_NODELAY);
-
-# TLS support requires IO::Socket::SSL
-use constant TLS => $ENV{MOJO_NO_TLS}
-  ? 0
-  : eval 'use IO::Socket::SSL 1.94 (); 1';
-use constant TLS_READ  => TLS ? IO::Socket::SSL::SSL_WANT_READ()  : 0;
-use constant TLS_WRITE => TLS ? IO::Socket::SSL::SSL_WANT_WRITE() : 0;
+use Mojo::TLS qw(TLS TLS_READ TLS_WRITE TLS_NPN TLS_ALPN mojo_protocols);
 
 # To regenerate the certificate run this command (18.04.2012)
 # openssl req -new -x509 -keyout server.key -out server.crt -nodes -days 7300
@@ -96,8 +90,10 @@ sub listen {
   };
   $tls->{SSL_ca_file} = $args->{tls_ca}
     if $args->{tls_ca} && -T $args->{tls_ca};
-  $tls->{SSL_cipher_list} = $args->{tls_ciphers} if $args->{tls_ciphers};
-  $tls->{SSL_version}     = $args->{tls_version} if $args->{tls_version};
+  $tls->{SSL_cipher_list}    = $args->{tls_ciphers} if $args->{tls_ciphers};
+  $tls->{SSL_version}        = $args->{tls_version} if $args->{tls_version};
+  $tls->{SSL_alpn_protocols} = [mojo_protocols]     if TLS_ALPN;
+  $tls->{SSL_npn_protocols} = [mojo_protocols] if !TLS_ALPN && TLS_NPN;
 }
 
 sub port { shift->{handle}->sockport }
